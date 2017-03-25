@@ -317,21 +317,19 @@ INCRELOJ: MOV AAUX, A
 					  INC MINC0
 					  
 	      COMP_MINC0: MOV A, #10D
-					  CJNE A, MINC0, FIN_INCRELOJ
-                      ACALL CHECAR_ALARMA
-                      ACALL PRENDE_ALARMA
+					  CJNE A, MINC0, FIN_INCRELOJ2
 					  MOV MINC0, #0D
 					  INC MINC1
 					  		  
 	      COMP_MINC1: MOV A, #06D
-					  CJNE A, MINC1, FIN_INCRELOJ
+					  CJNE A, MINC1, FIN_INCRELOJ2
 					  MOV MINC1, #0D
 					  INC HORC0
 					  		  
 	      COMP_HORC0: MOV A, #0AH
 					  CJNE A, HORC0, COMP_HORC02
 					  MOV A, #04H
-					  CJNE A, #04H, FIN_INCRELOJ
+					  CJNE A, #04H, FIN_INCRELOJ2
 					  MOV HORC0, #0D
 					  INC HORC1
 					  JMP COMP_HORC1
@@ -341,11 +339,17 @@ INCRELOJ: MOV AAUX, A
 					   JMP COMP_HORC1
 					  
 		  COMP_HORC1: MOV A, #03D
-					  CJNE A, HORC1, FIN_INCRELOJ 
+					  CJNE A, HORC1, FIN_INCRELOJ2
 					  MOV HORC1, #0D
-		 
+					  JMP FIN_INCRELOJ2
+					  
 		FIN_INCRELOJ: MOV A, AAUX
 					  RET
+					  
+		FIN_INCRELOJ2: ACALL CHECAR_ALARMA
+                       ACALL PRENDE_ALARMA
+					   MOV A, AAUX
+					   RET
 
 /* CHECAR SI YA ES LA HORA DE LA ALARMA */
 CHECAR_ALARMA:  MOV AAUX, A
