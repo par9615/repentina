@@ -356,10 +356,10 @@ CHECAR_ALARMA:  MOV AAUX, A
                 CHECAR_ALARMA_H0:   MOV A, HORC0
                                     CJNE A, ALHC0, CHECAR_ALARMA_FINB
 
-                CHECAR_ALARMA_H1:   MOV A, MINC1
+                CHECAR_ALARMA_M1:   MOV A, MINC1
                                     CJNE A, ALMC1, CHECAR_ALARMA_FINB
 
-                CHECAR_ALARMA_H1:   MOV A, MINC0
+                CHECAR_ALARMA_M0:   MOV A, MINC0
                                     CJNE A, ALMC0, CHECAR_ALARMA_FINB
 
                 CHECAR_ALARMA_SUCC: SETB ALARMA_ON
