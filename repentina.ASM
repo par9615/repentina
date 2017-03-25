@@ -3,9 +3,13 @@ ORG 0000H
 
 
 
+/* TMOD, TCON, IE, IP*/
+
+MOV TMOD, #22H ; TIMER 0 Y 1 EN AUTORRCARGA DE 8 BITS
+MOV TCON, #00h ;
+MOV IE, 
 
 
 
 
 
-/*Inicialiar TMOD, TCON, IE, 
