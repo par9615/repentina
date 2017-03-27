@@ -84,6 +84,10 @@ CUENTA20_2 EQU 0046H
 
 /* BIT DE ALARMA PRENDIDA */
 ALARMA_ON EQU 059H
+	
+/* VARIABLES PARA DEBOUNCER */
+REBOTE EQU 05AH
+PRESIONADO EQU 05BH
 
 /* ================= VECTORES DE INTERRUPCION ========================= */
 ORG 0000H
@@ -171,6 +175,10 @@ MOV AAUX, #00H
 /* INICIA ALARMA COMO APAGADA */
 CLR ALARMA_ON
 
+/* NO SE ESTA PRESIONANDO */
+CLR REBOTE
+CLR PRESIONADO
+
 /* ================= TIMER 2 ========================= */
 
 
@@ -211,6 +219,7 @@ MOV CUENTA20_2, #00H
 MOV R0, #CUENTA20
 MOV R1, #CUENTA20_2
 
+
 /* ================================================ */
 /* =                                              = */
 /* =                    MAIN                      = */
@@ -233,8 +242,13 @@ ITIM2:
 
 		FIN_ITIM2: RETI
 
-/*ITIM1:
-	RETI*/
+
+/*ITIM1:	
+        INC CUENTA50
+		CJNE R2, #050DM, FIN_ITIM1		
+		MOV CUENTA50,#00H
+	
+		FIN_ITIM1: RETI*/
 
 ITIM0:
 	INC CUENTA20_2
@@ -328,20 +342,25 @@ INCRELOJ: MOV AAUX, A
 					  		  
 	      COMP_HORC0: MOV A, #0AH
 					  CJNE A, HORC0, COMP_HORC02
-					  MOV A, #04H
-					  CJNE A, #04H, FIN_INCRELOJ2
+					  
 					  MOV HORC0, #0D
 					  INC HORC1
 					  JMP COMP_HORC1
 					  
-		  COMP_HORC02: MOV HORC0, #0D
+		  COMP_HORC02:  MOV A, #04H
+					    CJNE A, HORC0, FIN_INCRELOJ2
+						JMP COMP_HORC03
+						
+		  COMP_HORC03: MOV A, #02H
+					   CJNE A, HORC1, FIN_INCRELOJ2
+					   MOV HORC0, #0D
 					   INC HORC1
 					   JMP COMP_HORC1
-					  
+			  
 		  COMP_HORC1: MOV A, #03D
 					  CJNE A, HORC1, FIN_INCRELOJ2
 					  MOV HORC1, #0D
-					  JMP FIN_INCRELOJ2
+					  JMP FIN_INCRELOJ2		  
 					  
 		FIN_INCRELOJ: MOV A, AAUX
 					  RET
