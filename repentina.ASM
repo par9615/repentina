@@ -1,4 +1,4 @@
-
+/* Ángel Ávila y Miguel Hernández (Alondra Macias no ha llegado) */
 
 
 /* VALORES EN HEXA PARA MOSTRAR LOS NUMEROS EN EL DISPLAY */
