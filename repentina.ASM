@@ -269,14 +269,14 @@ ITIM0:
 REFRESH: MOV AAUX, A
 		 MOV A, DISP_SEL
 		 
-		 CASE0: CJNE A,#00H, CASE1
-			MOV A, SEGC0
-			LCALL BCDTOA
-			MOV SEGA0, A
-			MOV P0,#11111110B
+		 CASE0: CJNE A,#00H, CASE1 ; si no es el caso 0, checa si es el 1
+			MOV A, SEGC0 ; si es el caso, tomamos lo de la unidad de segundo
+			LCALL BCDTOA ; ese numero en A, lo convertimos al hexa de 7 segmentos que representa al numero
+			MOV SEGA0, A ; lo movemos a la unidad de segundo de actualizaciones (ahorita eso no hace nada)
+			MOV P0,#11111110B ; prendemos el display de hasta la derecha
 			; ESTADOS
 			; MOV A, SEGR0
-			JMP FIN_REFRESH
+			JMP FIN_REFRESH ; nos vamos al fin de la subrutina
 				
 		 CASE1: CJNE A,#01H, CASE2
 			MOV A, SEGC1
@@ -314,9 +314,9 @@ REFRESH: MOV AAUX, A
 			JMP RST_REFRESH
 
 		
-		FIN_REFRESH: INC DISP_SEL 
-		RST_REFRESH: MOV P2, A
-			     MOV A, AAUX
+		FIN_REFRESH: INC DISP_SEL ; pasamos al siguiente caso
+		RST_REFRESH: MOV P2, A ; los hexa de 7 segmentos los mandamos al P2 para que prendan los segmentos que tocan
+			     MOV A, AAUX ; regresamos lo que estaba en el A antes de entrar a la subrutina
 			     RET
 
 /* BCD */
@@ -327,9 +327,9 @@ BCDTOA: MOVC A,@A + DPTR
 INCRELOJ: MOV AAUX, A
 		  MOV A, #10D
 		  
-		  COMP_SEGC0: CJNE A, SEGC0, FIN_INCRELOJ
-			          MOV SEGC0, #0D
-			          INC SEGC1
+		  COMP_SEGC0: CJNE A, SEGC0, FIN_INCRELOJ ; si las unidades de segundos no son 10, terminamos las comparaciones
+			          MOV SEGC0, #0D ; si es 10D lo regresa a 0
+			          INC SEGC1 ; y luego incrementa las decenas de segundo
 			  
 		  COMP_SEGC1: MOV A, #06D
 					  CJNE A, SEGC1, FIN_INCRELOJ
@@ -346,22 +346,22 @@ INCRELOJ: MOV AAUX, A
 					  MOV MINC1, #0D
 					  INC HORC0
 					  		  
-	      COMP_HORC0: MOV A, #0AH
-					  CJNE A, HORC0, COMP_HORC02
+	      COMP_HORC0: MOV A, #0AH 
+					  CJNE A, HORC0, COMP_HORC02 ; si las horas no son 10D, pasamos a compararlas otra vez a ver si son 4
 					  
-					  MOV HORC0, #0D
-					  INC HORC1
-					  JMP COMP_HORC1
+					  MOV HORC0, #0D ; si son 10, las hacemos 0 
+					  INC HORC1 ; incrementamos las decenas de hora
+					  JMP COMP_HORC1 ; pasamos a la siguiente comparacion de las decenas de hora
 					  
 		  COMP_HORC02:  MOV A, #04H
-					    CJNE A, HORC0, FIN_INCRELOJ2
-						JMP COMP_HORC03
+					    CJNE A, HORC0, FIN_INCRELOJ2 ; si las unidades de hora tampoco son 4, terminamos las comp
+						JMP COMP_HORC03 ; como son 4, tenemos que comparar otra vez a ver si las decenas de hora son 2
 						
 		  COMP_HORC03: MOV A, #02H
-					   CJNE A, HORC1, FIN_INCRELOJ2
-					   MOV HORC0, #0D
-					   INC HORC1
-					   JMP COMP_HORC1
+					   CJNE A, HORC1, FIN_INCRELOJ2 ; si no son 2, salimos
+					   MOV HORC0, #0D ; de lo contrario bajamos las U a 0, porque serían las 00:00:00
+					   INC HORC1 ; incrementamos las decenas
+					   JMP COMP_HORC1 ; pasamos a la sig comparacion
 			  
 		  COMP_HORC1: MOV A, #03D
 					  CJNE A, HORC1, FIN_INCRELOJ2
@@ -379,8 +379,8 @@ INCRELOJ: MOV AAUX, A
 /* CHECAR SI YA ES LA HORA DE LA ALARMA */
 CHECAR_ALARMA:  MOV AAUX, A
 
-                CHECAR_ALARMA_H1:   MOV A, HORC1
-                                    CJNE A, ALHC1, CHECAR_ALARMA_FINB
+                CHECAR_ALARMA_H1:   MOV A, HORC1 ; vamos a comparar primero las decenas de hora
+                                    CJNE A, ALHC1, CHECAR_ALARMA_FINB ; si son iguales a las de la alarma seguimos comparando, si no, es el fin en el que no es la hora de la alarma
 
                 CHECAR_ALARMA_H0:   MOV A, HORC0
                                     CJNE A, ALHC0, CHECAR_ALARMA_FINB
@@ -391,24 +391,24 @@ CHECAR_ALARMA:  MOV AAUX, A
                 CHECAR_ALARMA_M0:   MOV A, MINC0
                                     CJNE A, ALMC0, CHECAR_ALARMA_FINB
 
-                CHECAR_ALARMA_SUCC: SETB ALARMA_ON
+                CHECAR_ALARMA_SUCC: SETB ALARMA_ON ; se prende el bit que dice que es la hora de la alarma
 
                 CHECAR_ALARMA_FINA:  MOV A, AAUX
                                     RET
 
-                CHECAR_ALARMA_FINB: CLR ALARMA_ON
+                CHECAR_ALARMA_FINB: CLR ALARMA_ON ; se apaga el bit que dice que es la hora de la alarma
                                     MOV A, AAUX
                                     RET
 
 /* PRENDER ALARMA SI DEBE ESTAR PRENDIDA */
 
-PRENDE_ALARMA: JNB ALARMA_ON, OFF
+PRENDE_ALARMA: JNB ALARMA_ON, OFF ; si es la hora de la alarma, sigue a ON
 
-ON: CLR P3.7
-JMP PRENDE_ALARMA_FIN
+ON: CLR P3.7 ; manda un 0 a donde tenemos conectada la bocina
+JMP PRENDE_ALARMA_FIN ; se sale de la subrutina
 
-OFF: SETB P3.7
-JMP PRENDE_ALARMA_FIN
+OFF: SETB P3.7 ; mana un 1 a donde tenemos conectada la bocina
+JMP PRENDE_ALARMA_FIN ; se sale de la subrutina
 
 PRENDE_ALARMA_FIN: RET
 
