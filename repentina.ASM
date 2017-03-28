@@ -92,8 +92,8 @@ ALARMA_ON EQU 059H
 REBOTE EQU 05AH
 PRESIONADO EQU 05BH
 	
-/* VARIABLES PARA INTERRUPCION */
-INT01 EQU 05CH
+/* VARIABLES PARA ESTADOS */
+ESTADO EQU 05CH
 
 /* ================= VECTORES DE INTERRUPCION ========================= */
 ORG 0000H
@@ -106,11 +106,11 @@ ORG 0003H
 ORG 000BH
 	JMP ITIM0
 
-/*ORG 0013H
+ORG 0013H
 	JMP IEXT1
 
 ORG 001BH
-	JMP ITIM1*/
+	JMP ITIM1
 
 ORG 002BH
 	CLR TF2
@@ -186,6 +186,9 @@ CLR ALARMA_ON
 CLR REBOTE
 CLR PRESIONADO
 
+/* ESTADO DE RELOJ */
+CLR ESTADO
+
 /* ================= TIMER 2 ========================= */
 
 
@@ -211,9 +214,10 @@ MOV IE, #10101111B
 MOV IP, #00101000B ; PRIORIDAD T2 Y T1, NO SE INTERRUMPEN
 
 /* VALORES INICIALES PARA TIMER 0 Y 1 CON AUTORECARGA */
-/*MOV TH1, #-200
+MOV TH1, #-200
 MOV TL1, #-200
-SETB TR1 ;INICIA TIMER 1*/
+SETB TR1 ;INICIA TIMER 1
+
 MOV DPTR, #1000H ;INICIALIZAR DPTR EN LA TABLA BCD
 
 MOV TH0, #-200 
@@ -241,14 +245,19 @@ SJMP $
 IEXT0:
 	;CLR EX0
 	CPL P1.0
-	MOV AAUX, A
-	MOV A, #INC_PRESIONADO
-	LCALL INCRELOJ
-	MOV A, AAUX
+	MOV AAUX, A					; Movemos al auxiliar lo de A para no perder su valor
+	MOV A, #INC_PRESIONADO		; Movemos un valor ya determinado a A para que cuando llamemos la sig subrutina
+	LCALL INCRELOJ				; esta sepa que vamos a incrementar los minutos en vez de los segundos
+	MOV A, AAUX					; Regresamos a A el valor que tenia antes de la interrupcion
 	
 	FIN_IEXT0: RETI
 	
 	
+IEXT1:	
+		CPL ESTADO
+		
+		FIN_IEXT1: RETI
+		
 ITIM2:
 		INC CUENTA20
 		CJNE @R0, #020D, FIN_ITIM2 
@@ -260,12 +269,12 @@ ITIM2:
 		FIN_ITIM2: RETI
 
 
-/*ITIM1:	
-        INC CUENTA50
+ITIM1:	
+        /*INC CUENTA50
 		CJNE R2, #050DM, FIN_ITIM1		
-		MOV CUENTA50,#00H
+		MOV CUENTA50,#00H*/
 	
-		FIN_ITIM1: RETI*/
+		FIN_ITIM1: RETI
 
 ITIM0:
 	INC CUENTA20_2
@@ -279,12 +288,13 @@ ITIM0:
 /* SUBRUTINA PARA EL REFRESH DEL DISPLAY (CADA 4ms) */
 REFRESH: MOV AAUX, A
 		 MOV A, DISP_SEL
+		 JB ESTADO, CASE0A
 		 
 		 CASE0: CJNE A,#00H, CASE1 ; si no es el caso 0, checa si es el 1
 			MOV A, SEGC0 ; si es el caso, tomamos lo de la unidad de segundo
 			LCALL BCDTOA ; ese numero en A, lo convertimos al hexa de 7 segmentos que representa al numero
 			MOV SEGA0, A ; lo movemos a la unidad de segundo de actualizaciones (ahorita eso no hace nada)
-			MOV P0,#11111110B ; prendemos el display de hasta la derecha
+			MOV P0,#11111110B ; prendemos el display de hasta la derecha			
 			; ESTADOS
 			; MOV A, SEGR0
 			JMP FIN_REFRESH ; nos vamos al fin de la subrutina
@@ -324,6 +334,43 @@ REFRESH: MOV AAUX, A
 			MOV P0,#11011111B
 			JMP RST_REFRESH
 
+		CASE0A: CJNE A,#00H, CASE1A ; si no es el caso 0, checa si es el 1
+			MOV A, ALSC0 ; si es el caso, tomamos lo de la unidad de segundo
+			LCALL BCDTOA ; ese numero en A, lo convertimos al hexa de 7 segmentos que representa al numero
+			MOV P0,#11111110B ; prendemos el display de hasta la derecha			
+			; ESTADOS
+			; MOV A, SEGR0
+			JMP FIN_REFRESH ; nos vamos al fin de la subrutina
+				
+		 CASE1A: CJNE A,#01H, CASE2A
+			MOV A, ALSC1
+			LCALL BCDTOA
+			MOV P0,#11111101B
+			JMP FIN_REFRESH
+				
+		 CASE2A: CJNE A,#02H, CASE3A
+			MOV A, ALMC0
+			LCALL BCDTOA
+			MOV P0,#11111011B
+			JMP FIN_REFRESH
+				
+		 CASE3A: CJNE A,#03H, CASE4A
+			MOV A, ALMC1
+			LCALL BCDTOA
+			MOV P0,#11110111B
+			JMP FIN_REFRESH
+				
+		 CASE4A: CJNE A,#04H, CASE5A
+			MOV A, ALHC0
+			LCALL BCDTOA
+			MOV P0,#11101111B
+			JMP FIN_REFRESH
+				
+		 CASE5A:	MOV DISP_SEL, #00H
+			MOV A, ALHC1
+			LCALL BCDTOA
+			MOV P0,#11011111B
+			JMP RST_REFRESH
 		
 		FIN_REFRESH: INC DISP_SEL ; pasamos al siguiente caso
 		RST_REFRESH: MOV P2, A ; los hexa de 7 segmentos los mandamos al P2 para que prendan los segmentos que tocan
@@ -338,9 +385,9 @@ BCDTOA: MOVC A,@A + DPTR
 /* INCREMENTAR SEGUNDOS*/
 INCRELOJ: MOV AAUX, A
 		  
-		  COMP_PRESIONADO: CJNE A, #INC_PRESIONADO, COMP_SEGC0
-						   INC MINC0
-						   JMP COMP_MINC0
+		  COMP_PRESIONADO: CJNE A, #INC_PRESIONADO, COMP_SEGC0 ; Si el boton de inc minutos no ue presionado, es porque vamos a inc seg
+						   INC MINC0 ; De lo contrario, incrementamos minutos
+						   JMP COMP_MINC0 ; Y procedemos a hacer los calculos normales
 		  
 		  COMP_SEGC0: MOV A, #10D
 					  CJNE A, SEGC0, FIN_INCRELOJ ; si las unidades de segundos no son 10, terminamos las comparaciones
