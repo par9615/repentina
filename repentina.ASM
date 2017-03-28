@@ -120,19 +120,19 @@ ORG 002BH
 /* VALORES INICIALES DE LA HORA PARA CALCULOS (12:00:00) */
 
 INICIALIZAR: 
-MOV HORC1, #00H
-MOV HORC0, #09H
-MOV MINC1, #05H
-MOV MINC0, #09H
-MOV SEGC1, #05H
-MOV SEGC0, #05H
+MOV HORC1, #01H
+MOV HORC0, #02H
+MOV MINC1, #00H
+MOV MINC0, #00H
+MOV SEGC1, #00H
+MOV SEGC0, #00H
 
 /* VALORES INICIALES DE LA HORA PARA EL DISPLAY DE ACTUALIZACIONES */
-MOV HORA1, #CERO
-MOV HORA0, #NUEVE
+MOV HORA1, #DOS
+MOV HORA0, #TRES
 MOV MINA1, #CINCO
 MOV MINA0, #NUEVE
-MOV SEGA1, #CINCO
+MOV SEGA1, #CUATRO
 MOV SEGA0, #CINCO
 
 /* VALORES INICIALES DE LA HORA PARA EL DISPLAY REAL */
@@ -152,7 +152,7 @@ MOV R6, #00H
 MOV R7, #00H
 
 /* VALORES INICIALES DE CALCULOS INTERNOS DE ALARMAS */
-MOV ALHC1, #01H
+MOV ALHC1, #00H
 MOV ALHC0, #00H
 MOV ALMC1, #00H
 MOV ALMC0, #00H
@@ -209,7 +209,7 @@ MOV T2CON, #00000100B
 - FALTA IP
 */
 MOV TMOD, #22H 
-MOV TCON, #05h ; NADA HABILITADO
+MOV TCON, #05h ;
 MOV IE, #10101111B
 MOV IP, #00101000B ; PRIORIDAD T2 Y T1, NO SE INTERRUMPEN
 
@@ -244,18 +244,25 @@ SJMP $
 	
 IEXT0:
 	;CLR EX0
-	CPL P1.0
+	;CPL P1.0
+	CPL PRESIONADO
+	
+	JB ESTADO, IEXT_INC_ALARMA
+	
 	MOV AAUX, A					; Movemos al auxiliar lo de A para no perder su valor
 	MOV A, #INC_PRESIONADO		; Movemos un valor ya determinado a A para que cuando llamemos la sig subrutina
 	LCALL INCRELOJ				; esta sepa que vamos a incrementar los minutos en vez de los segundos
 	MOV A, AAUX					; Regresamos a A el valor que tenia antes de la interrupcion
+	JMP FIN_IEXT0
 	
+	IEXT_INC_ALARMA: LCALL INC_ALARMA
+		
 	FIN_IEXT0: RETI
 	
 	
 IEXT1:	
 		CPL ESTADO
-		
+		CPL P1.0
 		FIN_IEXT1: RETI
 		
 ITIM2:
@@ -385,9 +392,11 @@ BCDTOA: MOVC A,@A + DPTR
 /* INCREMENTAR SEGUNDOS*/
 INCRELOJ: MOV AAUX, A
 		  
-		  COMP_PRESIONADO: CJNE A, #INC_PRESIONADO, COMP_SEGC0 ; Si el boton de inc minutos no ue presionado, es porque vamos a inc seg
-						   INC MINC0 ; De lo contrario, incrementamos minutos
-						   JMP COMP_MINC0 ; Y procedemos a hacer los calculos normales
+		  COMP_PRESIONADO: CJNE A, #INC_PRESIONADO, COMP_SEGC0 ; Si el boton de inc minutos no fue presionado, es porque vamos a inc seg
+						   INC MINC0
+						   JMP COMP_MINC0
+		  
+		  /* ------------------------- COMPARAR RELOJ ------------------------- */
 		  
 		  COMP_SEGC0: MOV A, #10D
 					  CJNE A, SEGC0, FIN_INCRELOJ ; si las unidades de segundos no son 10, terminamos las comparaciones
@@ -430,14 +439,55 @@ INCRELOJ: MOV AAUX, A
 					  CJNE A, HORC1, FIN_INCRELOJ2
 					  MOV HORC1, #0D
 					  JMP FIN_INCRELOJ2		  
-					  
-		FIN_INCRELOJ: MOV A, AAUX
+		
+		  FIN_INCRELOJ: MOV A, AAUX
 					  RET
+		
+		  FIN_INCRELOJ2: 	ACALL CHECAR_ALARMA
+							ACALL PRENDE_ALARMA
+							MOV A, AAUX
+							RET
 					  
-		FIN_INCRELOJ2: ACALL CHECAR_ALARMA
-                       ACALL PRENDE_ALARMA
-					   MOV A, AAUX
-					   RET
+		/* ------------------------- COMPARAR ALARMA ------------------------- */			  
+					  
+INC_ALARMA: MOV AAUX, A
+			COMP_ALARMA: INC ALMC0
+					  
+	      COMP_MINC0A: MOV A, #10D
+					  CJNE A, ALMC0, FIN_INCRELOJA
+					  MOV ALMC0, #0D
+					  INC ALMC1
+					  		  
+	      COMP_MINC1A: MOV A, #06D
+					  CJNE A, ALMC1, FIN_INCRELOJA
+					  MOV ALMC1, #0D
+					  INC ALHC0
+					  		  
+	      COMP_HORC0A: MOV A, #0AH 
+					  CJNE A, ALHC0, COMP_HORC02A ; si las horas no son 10D, pasamos a compararlas otra vez a ver si son 4
+					  
+					  MOV ALHC0, #0D ; si son 10, las hacemos 0 
+					  INC ALHC1 ; incrementamos las decenas de hora
+					  JMP COMP_HORC1A ; pasamos a la siguiente comparacion de las decenas de hora
+					  
+		  COMP_HORC02A:  MOV A, #04H
+					    CJNE A, ALHC0, FIN_INCRELOJA ; si las unidades de hora tampoco son 4, terminamos las comp
+						JMP COMP_HORC03A ; como son 4, tenemos que comparar otra vez a ver si las decenas de hora son 2
+						
+		  COMP_HORC03A: MOV A, #02H
+					   CJNE A, ALHC1, FIN_INCRELOJA ; si no son 2, salimos
+					   MOV ALHC0, #0D ; de lo contrario bajamos las U a 0, porque serían las 00:00:00
+					   INC ALHC1 ; incrementamos las decenas
+					   JMP COMP_HORC1A ; pasamos a la sig comparacion
+			  
+		  COMP_HORC1A: MOV A, #03D
+					  CJNE A, ALHC1, FIN_INCRELOJA
+					  MOV ALHC1, #0D
+					  JMP FIN_INCRELOJA			  
+		
+		FIN_INCRELOJA: MOV A, AAUX
+					   CPL PRESIONADO
+					  RET
 
 /* CHECAR SI YA ES LA HORA DE LA ALARMA */
 CHECAR_ALARMA:  MOV AAUX, A
@@ -467,13 +517,13 @@ CHECAR_ALARMA:  MOV AAUX, A
 
 PRENDE_ALARMA: JNB ALARMA_ON, OFF ; si es la hora de la alarma, sigue a ON
 
-ON: CLR P3.7 ; manda un 0 a donde tenemos conectada la bocina
-JMP PRENDE_ALARMA_FIN ; se sale de la subrutina
+	ON: CLR P3.7 ; manda un 0 a donde tenemos conectada la bocina
+	JMP PRENDE_ALARMA_FIN ; se sale de la subrutina
 
-OFF: SETB P3.7 ; mana un 1 a donde tenemos conectada la bocina
-JMP PRENDE_ALARMA_FIN ; se sale de la subrutina
+	OFF: SETB P3.7 ; mana un 1 a donde tenemos conectada la bocina
+	JMP PRENDE_ALARMA_FIN ; se sale de la subrutina
 
-PRENDE_ALARMA_FIN: RET
+	PRENDE_ALARMA_FIN: RET
 
 
 /* ================= TABLA BCD ========================= */
